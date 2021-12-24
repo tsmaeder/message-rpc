@@ -1,0 +1,29 @@
+{
+  "name": "@theia/core",
+  "version": "1.20.0",
+  "description": "Theia is a cloud & desktop IDE framework implemented in TypeScript.",
+  "main": "lib/common/index.js",
+  "typings": "lib/common/index.d.ts",
+  "dependencies": {
+    "mocha": "^9.1.3",
+    "chai": "4.3.4"
+  },
+  "devDependencies": {
+    "@types/chai": "4.3.0",
+    "@types/mocha": "9.0.0",
+    "@types/node": "^17.0.4"
+  },
+  "license": "EPL-2.0",
+  "files": [
+    "lib",
+    "shared",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "mocha lib/**/*.spec.js"
+  },
+  "nyc": {
+    "extends": "../../configs/nyc.json"
+  }
+}
