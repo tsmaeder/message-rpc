@@ -67,31 +67,32 @@ enum ObjectType {
     JSON = 0,
     ByteArray = 1,
     ObjectArray = 2,
-    Undefined = 3
+    Undefined = 3,
+    Object = 4
 }
 
 export interface ValueEncoder {
     is(value: any): boolean;
-    write(buf: WriteBuffer, value: any): void;
+    write(buf: WriteBuffer, value: any, recursiveEncode: (buf: WriteBuffer, value: any) => void): void;
 }
 
 export interface ValueDecoder {
-    read(buf: ReadBuffer): any;
+    read(buf: ReadBuffer, recursiveDecode: (buf: ReadBuffer) => unknown): unknown;
 }
 
 export class MessageDecoder {
     protected decoders: Map<number, ValueDecoder> = new Map();
 
     constructor() {
-        this.registerDecoder(ObjectType.ByteArray, {
-            read: buf => {
-                return buf.readBytes();
-            }
-        });
         this.registerDecoder(ObjectType.JSON, {
             read: buf => {
                 const json = buf.readString();
                 return JSON.parse(json);
+            }
+        });
+        this.registerDecoder(ObjectType.ByteArray, {
+            read: buf => {
+                return buf.readBytes();
             }
         });
         this.registerDecoder(ObjectType.ObjectArray, {
@@ -103,6 +104,19 @@ export class MessageDecoder {
         this.registerDecoder(ObjectType.Undefined, {
             read: () => undefined
         });
+
+        this.registerDecoder(ObjectType.Object, {
+            read: (buf, recursiveRead) => {
+                const propertyCount = buf.readInt();
+                const result = Object.create({});
+                for (let i = 0; i < propertyCount; i++) {
+                    const key = buf.readString();
+                    const value = recursiveRead(buf);
+                    result[key] = value;
+                }
+                return result;
+            }
+        })
     }
 
     registerDecoder(tag: number, decoder: ValueDecoder): void {
@@ -216,7 +230,9 @@ export class MessageDecoder {
         if (!decoder) {
             throw new Error(`No decoder for tag ${type}`);
         }
-        return decoder.read(buf);
+        return decoder.read(buf, innerBuffer => {
+            return this.readTypedValue(innerBuffer);
+        });
     }
 }
 
@@ -230,6 +246,25 @@ export class MessageEncoder {
             is: (value) => true,
             write: (buf, value) => {
                 buf.writeString(JSON.stringify(value));
+            }
+        });
+        this.registerEncoder(ObjectType.Object, {
+            is: (value) => typeof value === 'object',
+            write: (buf, object, recursiveEncode) => {
+                const properties = Object.keys(object);
+                const relevant = [];
+                for (const property of properties) {
+                    const value = object[property];
+                    if (typeof value !== 'function') {
+                        relevant.push([property, value]);
+                    }
+                }
+
+                buf.writeInt(relevant.length);
+                for (const [property, value] of relevant) {
+                    buf.writeString(property);
+                    recursiveEncode(buf, value);
+                }
             }
         });
         this.registerEncoder(ObjectType.Undefined, {
@@ -295,7 +330,9 @@ export class MessageEncoder {
         for (let i: number = this.encoders.length - 1; i >= 0; i--) {
             if (this.encoders[i][1].is(value)) {
                 buf.writeInt(this.encoders[i][0]);
-                this.encoders[i][1].write(buf, value);
+                this.encoders[i][1].write(buf, value, (innerBuffer, innerValue) => {
+                    this.writeTypedValue(innerBuffer, innerValue);
+                });
                 return;
             }
         }

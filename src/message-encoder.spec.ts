@@ -15,27 +15,25 @@
  ********************************************************************************/
 import { expect } from 'chai';
 import { ArrayBufferReadBuffer, ArrrayBufferWriteBuffer } from './array-buffer-message-buffer';
+import { MessageDecoder, MessageEncoder } from './message-encoder';
 
-describe('array message buffer tests', () => {
-    it('basic read write test', () => {
+describe('message buffer test', () => {
+    it('encode object', () => {
         const buffer = new ArrayBuffer(1024);
         const writer = new ArrrayBufferWriteBuffer(buffer);
 
-        writer.writeByte(8);
-        writer.writeInt(10000);
-        writer.writeBytes(new Uint8Array([1, 2, 3, 4]));
-        writer.writeString('this is a string');
-        writer.writeString('another string');
-        writer.commit();
+        const encoder = new MessageEncoder();
+        const jsonMangled = JSON.parse(JSON.stringify(encoder));
+
+        encoder.writeTypedValue(writer, encoder);
 
         const written = writer.getCurrentContents();
 
         const reader = new ArrayBufferReadBuffer(written);
 
-        expect(reader.readByte()).equal(8);
-        expect(reader.readInt()).equal(10000)
-        expect(reader.readBytes()).deep.equal(new Uint8Array([1, 2, 3, 4]).buffer);
-        expect(reader.readString()).equal('this is a string');
-        expect(reader.readString()).equal('another string');
+        const decoder = new MessageDecoder();
+        const decoded = decoder.readTypedValue(reader);
+
+        expect(decoded).deep.equal(jsonMangled);
     })
 });
