@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 import { ArrayBufferReadBuffer, ArrrayBufferWriteBuffer } from './array-buffer-message-buffer';
-import { Emitter, Event } from './event';
+import { Emitter, Event } from './env/event';
 import { ReadBuffer, WriteBuffer } from './message-buffer';
 
 export interface Channel {
@@ -62,6 +62,11 @@ export class ChannelMultiplexer {
     protected pendingOpen: Map<string, (channel: ForwardingChannel) => void> = new Map();
     protected openChannels: Map<string, ForwardingChannel> = new Map();
 
+    protected readonly onOpenChannelEmitter: Emitter<Channel> = new Emitter<Channel>();
+    get onDidOpenChannel(): Event<Channel> {
+        return this.onOpenChannelEmitter.event;
+    }
+
     constructor(protected readonly underlyingChannel: Channel) {
         this.underlyingChannel.onMessage(buffer => this.handleMessage(buffer));
         this.underlyingChannel.onClose(() => this.handleClose());
@@ -87,12 +92,15 @@ export class ChannelMultiplexer {
         const id = buffer.readString();
         switch (type) {
             case MessageTypes.AckOpen: {
-                // it would be an error if we did not have a handler
+                // edge case: both side try to open a channel at the same time.
                 const resolve = this.pendingOpen.get(id);
-                const channel = this.createChannel(id);
-                this.pendingOpen.delete(id);
-                this.openChannels.set(id, channel);
-                resolve!(channel);
+                if (resolve) {
+                    const channel = this.createChannel(id);
+                    this.pendingOpen.delete(id);
+                    this.openChannels.set(id, channel);
+                    resolve!(channel);
+                    this.onOpenChannelEmitter.fire(channel);
+                }
                 break;
             }
             case MessageTypes.Open: {
@@ -104,6 +112,8 @@ export class ChannelMultiplexer {
                         // edge case: both side try to open a channel at the same time.
                         resolve(channel);
                     }
+                    this.underlyingChannel.getWriteBuffer().writeByte(MessageTypes.AckOpen).writeString(id).commit();
+                    this.onOpenChannelEmitter.fire(channel);
                 }
 
                 break;
@@ -143,10 +153,15 @@ export class ChannelMultiplexer {
     }
 
     open(id: string): Promise<Channel> {
-        this.underlyingChannel.getWriteBuffer().writeByte(MessageTypes.Open).writeString(id).commit();
-        return new Promise((resolve, reject) => {
+        const result = new Promise<Channel>((resolve, reject) => {
             this.pendingOpen.set(id, resolve);
         });
+        this.underlyingChannel.getWriteBuffer().writeByte(MessageTypes.Open).writeString(id).commit();
+        return result;
+    }
+
+    getOpenChannel(id: string): Channel | undefined {
+        return this.openChannels.get(id);
     }
 }
 

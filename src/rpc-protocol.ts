@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { Emitter, Event, Deferred } from './event';
+import { Emitter, Event, Deferred } from './env/event';
 import { Channel } from './channel';
 import { ReadBuffer } from './message-buffer';
 import { MessageDecoder, MessageEncoder, MessageType } from './message-encoder';
@@ -30,7 +30,7 @@ export class RPCServer {
     }
 
     constructor(protected channel: Channel, public readonly requestHandler: (method: string, args: any[]) => Promise<any>) {
-        const registration = channel.onMessage(data => this.handleMessage(data));
+        const registration = channel.onMessage((data: ReadBuffer) => this.handleMessage(data));
         channel.onClose(() => registration.dispose());
     }
 
@@ -92,7 +92,7 @@ export class RpcClient {
     protected readonly decoder: MessageDecoder = new MessageDecoder();
 
     constructor(protected channel: Channel) {
-        const registration = channel.onMessage(data => this.handleMessage(data));
+        const registration = channel.onMessage((data: ReadBuffer) => this.handleMessage(data));
         channel.onClose(() => registration.dispose());
     }
 

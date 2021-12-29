@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 import { Channel } from './channel';
-import { Deferred } from './event';
+import { Deferred } from './env/event';
 import { RpcClient, RPCServer } from './rpc-protocol';
 
 export class RpcProxyHandler<T extends object> implements ProxyHandler<T> {
@@ -29,7 +29,7 @@ export class RpcProxyHandler<T extends object> implements ProxyHandler<T> {
         const isNotify = this.isNotification(p);
         return (...args: any[]) => {
             const method = p.toString();
-            return this.channelDeferred.promise.then(connection =>
+            return this.channelDeferred.promise.then((connection: RpcClient) =>
                 new Promise((resolve, reject) => {
                     try {
                         if (isNotify) {
@@ -73,8 +73,8 @@ export class RpcHandler {
     }
 
     onChannelOpen(channel: Channel) {
-        const server = new RPCServer(channel, (method, args) => this.handleRequest(method, args));
-        server.onNotification(({ method, args }) => this.onNotification(method, args));
+        const server = new RPCServer(channel, (method: string, args: any[]) => this.handleRequest(method, args));
+        server.onNotification((e: { method: string, args: any }) => this.onNotification(e.method, e.args));
     }
 
     protected async handleRequest(method: string, args: any[]): Promise<any> {

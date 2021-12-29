@@ -13,7 +13,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
-import { Emitter, Event } from './event';
+import { Emitter, Event } from './env/event';
 import { ReadBuffer, WriteBuffer } from './message-buffer';
 
 export class ArrrayBufferWriteBuffer implements WriteBuffer {

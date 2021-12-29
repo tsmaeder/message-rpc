@@ -30,32 +30,32 @@ export const enum MessageType {
     Cancel = 5,
 }
 
-export class CancelMessage {
+export interface CancelMessage {
     type: MessageType.Cancel;
     id: number;
 }
 
-export class RequestMessage {
+export interface RequestMessage {
     type: MessageType.Request;
     id: number;
     method: string;
     args: any[];
 }
 
-export class NotificationMessage {
+export interface NotificationMessage {
     type: MessageType.Notification;
     id: number;
     method: string;
     args: any[];
 }
 
-export class ReplyMessage {
+export interface ReplyMessage {
     type: MessageType.Reply;
     id: number;
     res: any;
 }
 
-export class ReplyErrMessage {
+export interface ReplyErrMessage {
     type: MessageType.ReplyErr;
     id: number;
     err: SerializedError;
