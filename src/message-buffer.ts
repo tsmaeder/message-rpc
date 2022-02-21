@@ -59,7 +59,8 @@ export class ForwardingWriteBuffer implements WriteBuffer {
 }
 
 /**
- * A buffer maintaining a read position capable of reading primitive values
+ * A buffer maintaining a read position in a buffer containing a received message capable of 
+ * reading primitive values.
  */
 export interface ReadBuffer {
     readByte(): number;

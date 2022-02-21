@@ -22,6 +22,10 @@ import { Channel } from './channel';
 import { ReadBuffer, WriteBuffer } from './message-buffer';
 import { ArrayBufferReadBuffer, ArrrayBufferWriteBuffer } from './array-buffer-message-buffer';
 
+/**
+ * An attempt at a channel implementation over a websocket with fallback to http.
+ */
+
 export interface WebSocketOptions {
     /**
      * True by default.

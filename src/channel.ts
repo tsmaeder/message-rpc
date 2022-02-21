@@ -17,11 +17,31 @@ import { ArrayBufferReadBuffer, ArrrayBufferWriteBuffer } from './array-buffer-m
 import { Emitter, Event } from './env/event';
 import { ReadBuffer, WriteBuffer } from './message-buffer';
 
+/**
+ * A channel is a bidirectinal communications channel with lifecycle and
+ * error signalling. Note that creation of channels is specific to particular
+ * implementations and thus not part of the protocol.
+ */
 export interface Channel {
+    /**
+     * The remote side has closed the channel
+     */
     onClose: Event<void>;
+    /**
+     * An error has occurred while writing to or reading from the channel
+     */
     onError: Event<any>;
+    /**
+     * A message has arrived and can be read using the given {@link ReadBuffer}
+     */
     onMessage: Event<ReadBuffer>;
+    /**
+     * Obtain a {@link WriteBuffer} to write a message to the channel.
+     */
     getWriteBuffer(): WriteBuffer;
+    /**
+     * Close this channel. No {@link onClose} event should be sent
+     */
     close(): void;
 }
 
@@ -32,7 +52,10 @@ enum MessageTypes {
     Data = 4
 }
 
-export class ForwardingChannel implements Channel {
+/**
+ * Helper class to implement the single channels on a {@link ChannelMultiplexer}
+ */
+class ForwardingChannel implements Channel {
     constructor(private readonly closeHander: () => void, private readonly writeBufferSource: () => WriteBuffer) {
     }
 
@@ -58,6 +81,12 @@ export class ForwardingChannel implements Channel {
     }
 }
 
+/**
+ * A class to encode/decode multiple channels over a single underlying {@link Channel}
+ * The write buffers in this implementation immediately write to the underlying 
+ * channel, so we rely on writers to the multiplexed channels to always commit their
+ * messages and always in one go.
+ */
 export class ChannelMultiplexer {
     protected pendingOpen: Map<string, (channel: ForwardingChannel) => void> = new Map();
     protected openChannels: Map<string, ForwardingChannel> = new Map();
@@ -165,6 +194,9 @@ export class ChannelMultiplexer {
     }
 }
 
+/**
+ * A pipe with two channels at each end for testing.
+ */
 export class ChannelPipe {
     readonly left: ForwardingChannel = new ForwardingChannel(() => this.right.onCloseEmitter.fire(), () => {
         const leftWrite = new ArrrayBufferWriteBuffer();

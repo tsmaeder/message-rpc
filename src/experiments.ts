@@ -17,6 +17,10 @@ import { ChannelPipe } from './channel';
 import { RpcHandler, RpcProxyHandler } from './rpc-proxy';
 import * as fs from 'fs';
 
+/**
+ * This file is for fiddling around and testing. Not production code.
+ */
+
 const pipe = new ChannelPipe();
 
 interface ReadFile {

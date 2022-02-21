@@ -15,6 +15,14 @@
  ********************************************************************************/
 import { ReadBuffer, WriteBuffer } from './message-buffer';
 
+/**
+ * This code lets you encode rpc protocol messages (request/reply/notification/error/cancel)
+ * into a channel write buffer and decode the same messages from a read buffer.
+ * Custom encoders/decoders can be registered to specially handling certain types of values
+ * to be encoded. Clients are responsible for ensuring that the set of tags for encoders
+ * is distinct and the same at both ends of a channel.
+ */
+
 export interface SerializedError {
     readonly $isError: true;
     readonly name: string;
@@ -70,15 +78,47 @@ enum ObjectType {
     Undefined = 3,
     Object = 4
 }
-
+/**
+ * A value encoder writes javascript values to a write buffer. Encoders will be asked
+ * in turn (ordered by their tag value, descending) whether they can encode a given value
+ * This means encoders with higher tag values have priority. Since the default encoders
+ * have tag values from 0-4, they can be easily overridden.
+ */
 export interface ValueEncoder {
+    /**
+     * Returns true if this encoder wants to encode this value.
+     * @param value the value to be encoded
+     */
     is(value: any): boolean;
+    /**
+     * Write the given value to the buffer. Will only be called if {@link is(value)} returns true.
+     * @param buf The buffer to write to
+     * @param value The value to be written
+     * @param recursiveEncode A function that will use the encoders registered on the {@link MessageEncoder}
+     * to write a value to the underlying buffer. This is used mostly to write structures like an array
+     * without having to know how to encode the values in the array
+     */
     write(buf: WriteBuffer, value: any, recursiveEncode: (buf: WriteBuffer, value: any) => void): void;
 }
 
+/**
+ * Reads javascript values from a read buffer
+ */
 export interface ValueDecoder {
+    /**
+     * Reads a value from a read buffer. This method will be called for the decoder that is 
+     * registered for the tag associated with the value encoder that encoded this value.
+     * @param buf The read buffer to read from 
+     * @param recursiveDecode A function that will use the decoders registered on the {@link MessageEncoder}
+     * to read values from the underlying read buffer. This is used mostly to decode structures like an array
+     * without having to know how to decode the values in the aray.
+     */
     read(buf: ReadBuffer, recursiveDecode: (buf: ReadBuffer) => unknown): unknown;
 }
+
+/**
+ * A MessageDecoder parses a ReadBuffer into a RCPMessage
+ */
 
 export class MessageDecoder {
     protected decoders: Map<number, ValueDecoder> = new Map();
@@ -235,7 +275,11 @@ export class MessageDecoder {
         });
     }
 }
-
+/**
+ * A MessageEncoder writes RCPMessage objects to a WriteBuffer. Note that it is 
+ * up to clients to commit the message. This allows for multiple messages being 
+ * encoded before sending.
+ */
 export class MessageEncoder {
     protected readonly encoders: [number, ValueEncoder][] = [];
     protected readonly registeredTags: Set<number> = new Set();

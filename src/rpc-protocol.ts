@@ -18,8 +18,10 @@ import { Emitter, Event, Deferred } from './env/event';
 import { Channel } from './channel';
 import { ReadBuffer } from './message-buffer';
 import { MessageDecoder, MessageEncoder, MessageType } from './message-encoder';
-
-
+/**
+ * A RCPServer reads rcp request and notification messages and sends the reply values or
+ * errors from the request to the channel.
+ */
 export class RPCServer {
     protected readonly encoder: MessageEncoder = new MessageEncoder();
     protected readonly decoder: MessageDecoder = new MessageDecoder();
@@ -84,6 +86,13 @@ export class RPCServer {
     }
 }
 
+/**
+ * An RpcClient sends requests and notifications to a remote server. 
+ * Clients can get a promise for the request result that will be either resolved or 
+ * rejected depending on the success of the request.
+ * The RpcClient keeps track of outstanding requests and matches replies to the appropriate request
+ * Currently, there is no timeout handling implemented in the client.
+ */
 export class RpcClient {
     protected readonly pendingRequests: Map<number, Deferred<any>> = new Map();
     protected nextMessageId: number = 0;

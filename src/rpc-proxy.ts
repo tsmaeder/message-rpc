@@ -17,6 +17,10 @@ import { Channel } from './channel';
 import { Deferred } from './env/event';
 import { RpcClient, RPCServer } from './rpc-protocol';
 
+/**
+ * A proxy handler that will send any method invocation on the proxied object
+ * as a rcp protocol message over a channel. 
+ */
 export class RpcProxyHandler<T extends object> implements ProxyHandler<T> {
     private channelDeferred: Deferred<RpcClient> = new Deferred();
 
@@ -55,7 +59,8 @@ export class RpcProxyHandler<T extends object> implements ProxyHandler<T> {
     }
 
     /**
-     * Return whether the given property represents a notification.
+     * Return whether the given property represents a notification. If true,
+     * the promise returned from the invocation will resolve immediatey to `undefined`
      *
      * A property leads to a notification rather than a method call if its name
      * begins with `notify` or `on`.
