@@ -18,7 +18,7 @@ import { ArrayBufferReadBuffer, ArrrayBufferWriteBuffer } from './array-buffer-m
 
 describe('array message buffer tests', () => {
     it('basic read write test', () => {
-        const buffer = new ArrayBuffer(1024);
+        const buffer = new Uint8Array(1024);
         const writer = new ArrrayBufferWriteBuffer(buffer);
 
         writer.writeByte(8);
@@ -34,7 +34,7 @@ describe('array message buffer tests', () => {
 
         expect(reader.readByte()).equal(8);
         expect(reader.readInt()).equal(10000)
-        expect(reader.readBytes()).deep.equal(new Uint8Array([1, 2, 3, 4]).buffer);
+        expect(reader.readBytes()).deep.equal(new Uint8Array([1, 2, 3, 4]));
         expect(reader.readString()).equal('this is a string');
         expect(reader.readString()).equal('another string');
     })

@@ -169,7 +169,7 @@ export class WebSocketClientChannel implements Channel {
                     this.fireSocketDidOpen();
                 }
                 const bytes = await response.arrayBuffer();
-                this.onMessageEmitter.fire(new ArrayBufferReadBuffer(bytes));
+                this.onMessageEmitter.fire(new ArrayBufferReadBuffer(new Uint8Array(bytes)));
             } else {
                 timeoutDuration = this.httpFallbackOptions?.errorTimeout || 0;
                 this.httpFallbackDisconnected = true;

@@ -201,14 +201,14 @@ export class ChannelPipe {
     readonly left: ForwardingChannel = new ForwardingChannel(() => this.right.onCloseEmitter.fire(), () => {
         const leftWrite = new ArrrayBufferWriteBuffer();
         leftWrite.onCommit(buffer => {
-            this.right.onMessageEmitter.fire(new ArrayBufferReadBuffer(buffer));
+            this.right.onMessageEmitter.fire(new ArrayBufferReadBuffer(new Uint8Array(buffer)));
         });
         return leftWrite;
     });
     readonly right: ForwardingChannel = new ForwardingChannel(() => this.left.onCloseEmitter.fire(), () => {
         const rightWrite = new ArrrayBufferWriteBuffer();
         rightWrite.onCommit(buffer => {
-            this.left.onMessageEmitter.fire(new ArrayBufferReadBuffer(buffer));
+            this.left.onMessageEmitter.fire(new ArrayBufferReadBuffer(new Uint8Array(buffer)));
         })
         return rightWrite;
     });

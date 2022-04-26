@@ -17,11 +17,11 @@ import { Emitter, Event } from './env/event';
 import { ReadBuffer, WriteBuffer } from './message-buffer';
 
 export class ArrrayBufferWriteBuffer implements WriteBuffer {
-    constructor(private buffer: ArrayBuffer = new ArrayBuffer(1024), private offset: number = 0) {
-    }
+    private encoder = new TextEncoder();
+    private msg: DataView;
 
-    private get msg() {
-        return new DataView(this.buffer);
+    constructor(private buffer: Uint8Array = new Uint8Array(1024 * 1024), private offset: number = 0) {
+        this.msg = new DataView(buffer.buffer);
     }
 
     ensureCapacity(value: number): WriteBuffer {
@@ -30,19 +30,37 @@ export class ArrrayBufferWriteBuffer implements WriteBuffer {
             newLength *= 2;
         }
         if (newLength !== this.buffer.byteLength) {
-            const newBuffer = new ArrayBuffer(newLength);
-            new Uint8Array(newBuffer).set(new Uint8Array(this.buffer));
+            console.log("reallocating to " + newLength);
+            const newBuffer = new Uint8Array(newLength);
+            newBuffer.set(this.buffer);
             this.buffer = newBuffer;
+            this.msg = new DataView(this.buffer.buffer);
+        }
+        return this;
+    }
+
+    writeLength(length: number): WriteBuffer {
+        if (length < 127) {
+            this.writeByte(length);
+        } else {
+            this.writeByte(128 + (length & 127));
+            this.writeLength(length >> 7);
         }
         return this;
     }
 
     writeByte(value: number): WriteBuffer {
         this.ensureCapacity(1);
-        this.msg.setUint8(this.offset++, value);
+        this.buffer[this.offset++] = value;
         return this;
     }
 
+    writeNumber(value: number): WriteBuffer {
+        this.ensureCapacity(8);
+        this.msg.setFloat64(this.offset, value);
+        this.offset += 8;
+        return this;
+    }
 
     writeInt(value: number): WriteBuffer {
         this.ensureCapacity(4);
@@ -52,19 +70,21 @@ export class ArrrayBufferWriteBuffer implements WriteBuffer {
     }
 
     writeString(value: string): WriteBuffer {
-        const encoded = this.encodeString(value);
-        this.writeBytes(encoded);
+        this.ensureCapacity(4 * value.length);
+        const result = this.encoder.encodeInto(value, this.buffer.subarray(this.offset + 4));
+        this.msg.setUint32(this.offset, result.written!);
+        this.offset += 4 + result.written!;
         return this;
     }
 
-    private encodeString(value: string): Uint8Array {
-        return new TextEncoder().encode(value);
+    encodeString(value: string): Uint8Array {
+        return this.encoder.encode(value);
     }
 
-    writeBytes(value: ArrayBuffer): WriteBuffer {
-        this.ensureCapacity(value.byteLength + 4);
-        this.writeInt(value.byteLength);
-        new Uint8Array(this.buffer).set(new Uint8Array(value), this.offset);
+    writeBytes(value: Uint8Array): WriteBuffer {
+        this.writeLength(value.byteLength);
+        this.ensureCapacity(value.length);
+        this.buffer.set(value, this.offset);
         this.offset += value.byteLength;
         return this;
     }
@@ -78,23 +98,39 @@ export class ArrrayBufferWriteBuffer implements WriteBuffer {
         this.onCommitEmitter.fire(this.getCurrentContents());
     }
 
-    getCurrentContents(): ArrayBuffer {
+    getCurrentContents(): Uint8Array {
         return this.buffer.slice(0, this.offset);
     }
 }
 
 export class ArrayBufferReadBuffer implements ReadBuffer {
     private offset: number = 0;
+    private msg;
 
-    constructor(private readonly buffer: ArrayBuffer) {
-    }
-
-    private get msg(): DataView {
-        return new DataView(this.buffer);
+    constructor(private readonly buffer: Uint8Array) {
+        this.msg = new DataView(buffer.buffer);
     }
 
     readByte(): number {
         return this.msg.getUint8(this.offset++);
+    }
+
+    readLength(): number {
+        let shift = 0;
+        let byte = this.readByte();
+        let value = (byte & 127) << shift;
+        while (byte > 127) {
+            shift += 7;
+            byte = this.readByte();
+            value = value + ((byte & 127) << shift);
+        }
+        return value;
+    }
+
+    readNumber(): number {
+        const result = this.msg.getFloat64(this.offset);
+        this.offset += 8;
+        return result;
     }
 
     readInt(): number {
@@ -104,8 +140,7 @@ export class ArrayBufferReadBuffer implements ReadBuffer {
     }
 
     readString(): string {
-        const len = this.msg.getUint32(this.offset);
-        this.offset += 4;
+        const len = this.readInt();
         const result = this.decodeString(this.buffer.slice(this.offset, this.offset + len));
         this.offset += len;
         return result;
@@ -115,9 +150,8 @@ export class ArrayBufferReadBuffer implements ReadBuffer {
         return new TextDecoder().decode(buf);
     }
 
-    readBytes(): ArrayBuffer {
-        const length = this.msg.getUint32(this.offset);
-        this.offset += 4;
+    readBytes(): Uint8Array {
+        const length = this.readLength();
         const result = this.buffer.slice(this.offset, this.offset + length);
         this.offset += length;
         return result;

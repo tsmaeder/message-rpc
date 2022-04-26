@@ -18,10 +18,12 @@
  * A buffer maintaining a write position capable of writing primitive values
  */
 export interface WriteBuffer {
+    writeLength(length: number): WriteBuffer
     writeByte(byte: number): WriteBuffer
+    writeNumber(value: number): WriteBuffer;
     writeInt(value: number): WriteBuffer;
     writeString(value: string): WriteBuffer;
-    writeBytes(value: ArrayBuffer): WriteBuffer;
+    writeBytes(value: Uint8Array): WriteBuffer;
 
     /**
      * Makes any writes to the buffer permanent, for example by sending the writes over a channel.
@@ -33,8 +35,19 @@ export interface WriteBuffer {
 export class ForwardingWriteBuffer implements WriteBuffer {
     constructor(protected readonly underlying: WriteBuffer) {
     }
+
+    writeLength(length: number): WriteBuffer {
+        this.underlying.writeLength(length);
+        return this;
+    }
+
     writeByte(byte: number): WriteBuffer {
         this.underlying.writeByte(byte);
+        return this;
+    }
+
+    writeNumber(value: number): WriteBuffer {
+        this.underlying.writeNumber(value);
         return this;
     }
 
@@ -48,7 +61,7 @@ export class ForwardingWriteBuffer implements WriteBuffer {
         return this;
     }
 
-    writeBytes(value: ArrayBuffer): WriteBuffer {
+    writeBytes(value: Uint8Array): WriteBuffer {
         this.underlying.writeBytes(value);
         return this;
     }
@@ -63,8 +76,10 @@ export class ForwardingWriteBuffer implements WriteBuffer {
  * reading primitive values.
  */
 export interface ReadBuffer {
+    readLength(): number;
     readByte(): number;
+    readNumber(): number;
     readInt(): number;
     readString(): string;
-    readBytes(): ArrayBuffer;
+    readBytes(): Uint8Array;
 }

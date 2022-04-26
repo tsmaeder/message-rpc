@@ -19,7 +19,7 @@ import { MessageDecoder, MessageEncoder } from './message-encoder';
 
 describe('message buffer test', () => {
     it('encode object', () => {
-        const buffer = new ArrayBuffer(1024);
+        const buffer = new Uint8Array(1024);
         const writer = new ArrrayBufferWriteBuffer(buffer);
 
         const encoder = new MessageEncoder();

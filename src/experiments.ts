@@ -13,44 +13,128 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
-import { ChannelPipe } from './channel';
-import { RpcHandler, RpcProxyHandler } from './rpc-proxy';
-import * as fs from 'fs';
+import { MessageDecoder, MessageEncoder } from './message-encoder';
+import { ArrayBufferReadBuffer, ArrrayBufferWriteBuffer } from './array-buffer-message-buffer';
 
 /**
  * This file is for fiddling around and testing. Not production code.
  */
 
-const pipe = new ChannelPipe();
 
-interface ReadFile {
-    read(path: string): Promise<ArrayBuffer>;
+//onst toEncode = ['string1', 'string2'];
+
+// Encode with stringify 
+//const stringified = JSON.stringify(toEncode);
+//const encoded1 = Buffer.from(stringified);
+//console.log(encoded1.byteLength);
+
+// then encoded1.byteLength= 21
+
+// Encode with MessageEncoder
+const encoder = new MessageEncoder();
+//const writer = new ArrrayBufferWriteBuffer();
+//encoder.writeTypedValue(writer, toEncode);
+//const encoded2 = writer.getCurrentContents();
+//console.log(encoded2.byteLength);
+// then encoded2.byteLength=  42
+// so factor 2 in this case
+
+const test1 = {
+    'curve': 'yes',
+    'successful': false,
+    'does': [
+        [
+            'tool',
+            'strange',
+            'declared',
+            false,
+            'if',
+            false,
+            false,
+            true,
+            true,
+            196639994
+        ],
+        -1697924638.043861,
+        1921422646,
+        'hide',
+        false,
+        true,
+        true,
+        -400170969,
+        550424783,
+        -2118374202.4598904
+    ],
+    'fish': 664495385.6069336,
+    'eat': -1205575089,
+    'boat': 1495629676,
+    'arm': 'nation',
+    'height': false,
+    'underline': 'have',
+    'satellites': -20686813.87966633
+};
+
+const test2: unknown[] = [];
+for (let index = 0; index < 100; index++) {
+    test2.push(test1);
 }
 
-class Server implements ReadFile {
-    read(path: string): Promise<ArrayBuffer> {
-        const bytes = fs.readFileSync(path);
-        const result = new ArrayBuffer(bytes.byteLength);
-        bytes.copy(new Uint8Array(result));
-        return Promise.resolve(result);
+const test3: string[] = [];
+for (let index = 0; index < 1000; index++) {
+    test3.push(`${index}`);
+
+}
+
+
+time(10000, () => writeTypedValue(test2), 'New encoding of object');
+time(10000, () => writeTypedValue(JSON.stringify(test2)), 'Stringify of object');
+
+function writeTypedValue(object: unknown) {
+    const writer = new ArrrayBufferWriteBuffer();
+    encoder.writeTypedValue(writer, object);
+    writer.getCurrentContents();
+}
+
+function time(times: number, payload: () => void, name: string) {
+    const start2 = Date.now();
+    for (let index = 0; index < times; index++) {
+        payload();
+        // test(test1);
+        // test(test2);
+        // test(test3);
     }
+    const end2 = Date.now();
+    console.log(`${name} took ${end2 - start2} ms.`);
 }
 
-const handler = new RpcHandler(new Server());
-handler.onChannelOpen(pipe.right);
+export function test(object: unknown): void {
+    // console.log('Start test');
+    const encoder = new MessageEncoder();
+    const decoder = new MessageDecoder();
+    // const string = fs.readFileSync(process.argv[2], 'utf8');
+    // const object = JSON.parse(string);
 
-const proxyHandler = new RpcProxyHandler<ReadFile>();
-const proxy: ReadFile = new Proxy(Object.create(null), proxyHandler);
-proxyHandler.onChannelOpen(pipe.left);
+    //const start1 = Date.now();
+    const result = Buffer.from(JSON.stringify(object));
+    //const end1 = Date.now();
+    //console.log(`Stringify encoding of object took ${end1 - start1} ms. Final byte length: ${result.byteLength}`);
 
-const t0 = new Date().getTime();
+    const writer = new ArrrayBufferWriteBuffer();
+    //const start2 = Date.now();
+    encoder.writeTypedValue(writer, object);
+    const result2 = writer.getCurrentContents();
+    //const end2 = Date.now();
+    //console.log(`New encoding of object took ${end2 - start2} ms. Final byte length: ${result2.byteLength}`);
 
-proxy.read(process.argv[2]).then(value => {
-    const t1 = new Date().getTime();
-    console.log(`read file of length: ${value.byteLength} in ${t1 - t0}ms`);
-    console.log(value.slice(0, 20));
-}).catch(e => {
-    console.log(e);
-});
+    //const start3 = Date.now();
+    JSON.parse(result.toString());
+    //const end3 = Date.now();
+    //console.log(`Stringify Reading took ${end3 - start3} ms for`);
 
-
+    const reader = new ArrayBufferReadBuffer(result2);
+    //const start4 = Date.now();
+    decoder.readTypedValue(reader);
+    //const end4 = Date.now();
+    //console.log(`New Reading took ${end4 - start4} ms for`);
+    // console.log();
+}

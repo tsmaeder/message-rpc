@@ -76,7 +76,10 @@ enum ObjectType {
     ByteArray = 1,
     ObjectArray = 2,
     Undefined = 3,
-    Object = 4
+    Object = 4,
+    String = 5,
+    Boolean = 6,
+    Number = 7
 }
 /**
  * A value encoder writes javascript values to a write buffer. Encoders will be asked
@@ -147,7 +150,7 @@ export class MessageDecoder {
 
         this.registerDecoder(ObjectType.Object, {
             read: (buf, recursiveRead) => {
-                const propertyCount = buf.readInt();
+                const propertyCount = buf.readLength();
                 const result = Object.create({});
                 for (let i = 0; i < propertyCount; i++) {
                     const key = buf.readString();
@@ -156,7 +159,24 @@ export class MessageDecoder {
                 }
                 return result;
             }
+        });
+        this.registerDecoder(ObjectType.String, {
+            read: (buf, recursiveRead) => {
+                return buf.readString();
+            }
         })
+
+        this.registerDecoder(ObjectType.Boolean, {
+            read: buf => {
+                return buf.readByte() === 1;
+            }
+        });
+
+        this.registerDecoder(ObjectType.Number, {
+            read: buf => {
+                return buf.readNumber();
+            }
+        });
     }
 
     registerDecoder(tag: number, decoder: ValueDecoder): void {
@@ -256,7 +276,7 @@ export class MessageDecoder {
     }
 
     readArray(buf: ReadBuffer): any[] {
-        const length = buf.readInt();
+        const length = buf.readLength();
         const result = new Array(length);
         for (let i = 0; i < length; i++) {
             result[i] = this.readTypedValue(buf);
@@ -265,7 +285,7 @@ export class MessageDecoder {
     }
 
     readTypedValue(buf: ReadBuffer): any {
-        const type = buf.readInt();
+        const type = buf.readByte();
         const decoder = this.decoders.get(type);
         if (!decoder) {
             throw new Error(`No decoder for tag ${type}`);
@@ -292,6 +312,7 @@ export class MessageEncoder {
                 buf.writeString(JSON.stringify(value));
             }
         });
+
         this.registerEncoder(ObjectType.Object, {
             is: (value) => typeof value === 'object',
             write: (buf, object, recursiveEncode) => {
@@ -304,7 +325,7 @@ export class MessageEncoder {
                     }
                 }
 
-                buf.writeInt(relevant.length);
+                buf.writeLength(relevant.length);
                 for (const [property, value] of relevant) {
                     buf.writeString(property);
                     recursiveEncode(buf, value);
@@ -327,6 +348,27 @@ export class MessageEncoder {
             is: (value) => value instanceof ArrayBuffer,
             write: (buf, value) => {
                 buf.writeBytes(value);
+            }
+        });
+
+        this.registerEncoder(ObjectType.String, {
+            is: (value) => typeof value === 'string',
+            write: (buf, value) => {
+                buf.writeString(value);
+            }
+        });
+
+        this.registerEncoder(ObjectType.Boolean, {
+            is: (value) => typeof value === 'boolean',
+            write: (buf, value) => {
+                buf.writeByte(value === true ? 1 : 0);
+            }
+        });
+
+        this.registerEncoder(ObjectType.Number, {
+            is: (value) => typeof value === 'number',
+            write: (buf, value) => {
+                buf.writeNumber(value);
             }
         });
     }
@@ -373,7 +415,7 @@ export class MessageEncoder {
     writeTypedValue(buf: WriteBuffer, value: any): void {
         for (let i: number = this.encoders.length - 1; i >= 0; i--) {
             if (this.encoders[i][1].is(value)) {
-                buf.writeInt(this.encoders[i][0]);
+                buf.writeByte(this.encoders[i][0]);
                 this.encoders[i][1].write(buf, value, (innerBuffer, innerValue) => {
                     this.writeTypedValue(innerBuffer, innerValue);
                 });
@@ -383,7 +425,7 @@ export class MessageEncoder {
     }
 
     writeArray(buf: WriteBuffer, value: any[]): void {
-        buf.writeInt(value.length);
+        buf.writeLength(value.length);
         for (let i = 0; i < value.length; i++) {
             this.writeTypedValue(buf, value[i]);
         }
